@@ -1,4 +1,5 @@
 from datetime import datetime
+from hashlib import md5
 from typing import Union
 
 from flask_login import UserMixin
@@ -15,6 +16,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(128), index=True, unique=True)
     password_hash = db.Column(db.String(128))
     posts = db.relationship("Post", backref="author", lazy="dynamic")
+    about_me = db.Column(db.String(140))
+    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f"<User {self.username}>"
@@ -27,15 +30,15 @@ class User(UserMixin, db.Model):
         """Checks whether the provided password is valid for the user's password hash"""
         return check_password_hash(self.password_hash, password)
 
+    def avatar(self, size):
+        digest = md5(self.email.lower().encode("utf-8")).hexdigest()
+        return f"https://www.gravatar.com/avatar/{digest}?d=retro&s={size}"
+
 
 @login.user_loader
 def load_user(id: Union[str, int]) -> User:
-    """Looks up a user by ID. Used as the user_loader for flask_login."""
-    try:
-        int_id = int(id)
-    except ValueError:
-        raise ValueError("Invalid user ID provided: Must be convertible to integer")
-    return User.query.get(int_id)
+    """Looks up a user by ID. Used as the user_loader callback for flask_login."""
+    return User.query.get(int(id))
 
 
 class Post(db.Model):
