@@ -122,21 +122,19 @@ def user(username):
 def edit_profile():
     """User profile editing view"""
 
-    form = EditProfileForm()
+    form = EditProfileForm(current_user.username)
     if form.validate_on_submit():
         current_user.username = form.username.data
         current_user.about_me = form.about_me.data
-        # I'm using a probably over-complicated try/except/else/finally because both branches of the
-        # try/except have the same return
         try:
             db.session.commit()
-        except (DBAPIError, SQLAlchemyError):
+        except (DBAPIError, SQLAlchemyError) as e:
             db.session.rollback()
             flash("Could not edit user profile, please try again!")
+            app.logger.error(e)
         else:
             flash("Your changes have been saved.")
-        finally:
-            return redirect(url_for("edit_profile"))
+        return redirect(url_for("edit_profile"))
     elif request.method == "GET":
         form.username.data = current_user.username
         form.about_me.data = current_user.about_me
