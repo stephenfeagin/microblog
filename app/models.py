@@ -8,6 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login
 
 
+followers = db.Table(
+    "followers",
+    db.Column("follower_id", db.Integer, db.ForeignKey("user.id")),
+    db.Column("followed_id", db.Integer, db.ForeignKey("user.id")),
+)
+
+
 class User(UserMixin, db.Model):
     """SQLAlchemy model for Users. Inherits from flask_login.UserMixin."""
 
@@ -18,6 +25,14 @@ class User(UserMixin, db.Model):
     posts = db.relationship("Post", backref="author", lazy="dynamic")
     about_me = db.Column(db.String(140))
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    followed = db.relationship(
+        "User",
+        secondary=followers,
+        primaryjoin=(followers.c.follower_id == id),
+        secondaryjoin=(followers.c.followed_id == id),
+        backref=db.backref("followers", lazy="dynamic"),
+        lazy="dynamic",
+    )
 
     def __repr__(self):
         return f"<User {self.username}>"
@@ -30,9 +45,34 @@ class User(UserMixin, db.Model):
         """Checks whether the provided password is valid for the user's password hash"""
         return check_password_hash(self.password_hash, password)
 
-    def avatar(self, size):
+    def avatar(self, size: Union[str, int]) -> str:
+        """Returns the URL for a user's Gravatar image"""
         digest = md5(self.email.lower().encode("utf-8")).hexdigest()
         return f"https://www.gravatar.com/avatar/{digest}?d=retro&s={size}"
+
+    def is_following(self, user) -> bool:
+        """Indicates whether user is in the parent object's `followed` list"""
+        return self.followed.filter(followers.c.followed_id == user.id).count() > 0
+
+    def follow(self, user) -> None:
+        """Adds user to parent object's `followed` list"""
+        if not self.is_following(user):
+            self.followed.append(user)
+
+    def unfollow(self, user) -> None:
+        """Removes user from parent object's `followed` list"""
+        try:
+            self.followed.remove(user)
+        except ValueError:
+            pass
+
+    def followed_posts(self):
+        """Fetches posts written by users in the parent object's `followed` list"""
+        followed = Post.query.join(
+            followers, (followers.c.followed_id == Post.user_id)
+        ).filter(followers.c.follower_id == self.id)
+        own = Post.query.filter_by(user_id=self.id)
+        return followed.union(own).order_by(Post.timestamp.desc())
 
 
 @login.user_loader
