@@ -1,14 +1,16 @@
 """app/routes.py"""
 from datetime import datetime
+from typing import Optional
 
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from flask_sqlalchemy import Pagination
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from werkzeug.urls import url_parse
 
 from app import app, db
-from app.forms import EditProfileForm, LoginForm, RegistrationForm
-from app.models import User
+from app.forms import EditProfileForm, LoginForm, PostForm, RegistrationForm
+from app.models import Post, User
 
 
 @app.before_request
@@ -20,6 +22,8 @@ def before_request():
     - This might not work nicely because of time zone conversion -- could be the same day
     locally but different days in UTC, or vice-versa
     - But I don't like having a database write on every single request by a logged-in user
+    - Could do if last_seen is greater than an hour old
+    - Or just if last_seen UTC is earlier than today UTC
     """
 
     if current_user.is_authenticated:
@@ -30,17 +34,44 @@ def before_request():
             db.session.rollback()
 
 
-@app.route("/")
-@app.route("/index")
+@app.route("/", methods=["GET", "POST"])
+@app.route("/index", methods=["GET", "POST"])
 @login_required
 def index():
     """Home page view"""
 
-    posts = [
-        {"author": {"username": "John"}, "body": "Beautiful day in Portland!"},
-        {"author": {"username": "Susan"}, "body": "The Avengers movie was so cool!"},
-    ]
-    return render_template("index.html", title="Home", posts=posts)
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(body=form.post.data, author=current_user)
+        try:
+            db.session.add(post)
+            db.session.commit()
+        except (DBAPIError, SQLAlchemyError) as e:
+            db.session.rollback()
+            flash("Could not process your post, please try again!")
+            app.logger.error(e)
+        else:
+            flash("Your post is now live!")
+        return redirect(url_for("index"))
+
+    page = request.args.get("page", default=1, type=int)
+    posts: Pagination = current_user.followed_posts().paginate(
+        page, app.config["POSTS_PER_PAGE"], error_out=False
+    )
+    next_url: Optional[str] = url_for(
+        "index", page=posts.next_num
+    ) if posts.has_next else None
+    prev_url: Optional[str] = url_for(
+        "index", page=posts.prev_num
+    ) if posts.has_prev else None
+    return render_template(
+        "index.html",
+        title="Home",
+        form=form,
+        posts=posts.items,
+        next_url=next_url,
+        prev_url=prev_url,
+    )
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -53,7 +84,7 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        user: Optional[User] = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
             flash("Invalid username or password")
             return redirect(url_for("login"))
@@ -108,13 +139,20 @@ def register():
 def user(username):
     """User profile view"""
 
-    user = User.query.filter_by(username=username).first_or_404()
-    posts = [
-        {"author": user, "body": "Test post #1"},
-        {"author": user, "body": "Test post #2"},
-    ]
-
-    return render_template("user.html", user=user, posts=posts)
+    user: User = User.query.filter_by(username=username).first_or_404()
+    page = request.args.get("page", default=1, type=int)
+    posts: Pagination = user.posts.order_by(Post.timestamp.desc()).paginate(
+        page, app.config["POSTS_PER_PAGE"], error_out=False
+    )
+    next_url: Optional[str] = url_for(
+        "user", username=user.username, page=posts.next_num
+    ) if posts.has_next else None
+    prev_url: Optional[str] = url_for(
+        "user", username=user.username, page=posts.prev_num
+    ) if posts.has_prev else None
+    return render_template(
+        "user.html", user=user, posts=posts.items, next_url=next_url, prev_url=prev_url
+    )
 
 
 @app.route("/edit_profile", methods=["GET", "POST"])
@@ -146,7 +184,7 @@ def edit_profile():
 @login_required
 def follow(username):
     """Endpoint for following another user"""
-    user = User.query.filter_by(username=username).first()
+    user: Optional[User] = User.query.filter_by(username=username).first()
     if user is None:
         flash(f"User {username} not found.")
         return redirect(url_for("index"))
@@ -163,7 +201,7 @@ def follow(username):
 @login_required
 def unfollow(username):
     """Endpoint for unfollowing another user"""
-    user = User.query.filter_by(username=username).first()
+    user: Optional[User] = User.query.filter_by(username=username).first()
     if user is None:
         flash(f"User {username} not found.")
         return redirect(url_for("index"))
@@ -174,3 +212,27 @@ def unfollow(username):
     db.session.commit()
     flash(f"You are no longer following {username}.")
     return redirect(url_for("user", username=username))
+
+
+@app.route("/explore")
+@login_required
+def explore():
+    """View for displaying recent posts by all users"""
+
+    page = request.args.get("page", default=1, type=int)
+    posts: Pagination = Post.query.order_by(Post.timestamp.desc()).paginate(
+        page, app.config["POSTS_PER_PAGE"], error_out=False
+    )
+    next_url: Optional[str] = url_for(
+        "index", page=posts.next_num
+    ) if posts.has_next else None
+    prev_url: Optional[str] = url_for(
+        "index", page=posts.prev_num
+    ) if posts.has_prev else None
+    return render_template(
+        "index.html",
+        title="Explore",
+        posts=posts.items,
+        next_url=next_url,
+        prev_url=prev_url,
+    )

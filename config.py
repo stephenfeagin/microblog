@@ -9,6 +9,8 @@ class Config:
 
     SECRET_KEY: str = os.environ.get("SECRET_KEY") or "you-will-never-guess"
 
+    POSTS_PER_PAGE = 10
+
     # SQLAlchemy setup
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "DATABASE_URL"

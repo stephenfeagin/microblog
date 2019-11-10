@@ -3,8 +3,32 @@
 {% block content %}
 
 <h1>Hello, {{ current_user.username }}!</h1>
+
+{% if form %}
+<form action="" method="post">
+    {{ form.hidden_tag() }}
+    <p>
+        {{ form.post.label }} <br>
+        {{ form.post(cols=32, rows=4) }} <br>
+        {% for error in form.post.errors %}
+        <span style="color: red;">[{{ error }}]</span><!-- TODO: change to CSS class -->
+        {% endfor %}
+    </p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% endif %}
+
+<table>
 {% for post in posts %}
-<div><p>{{ post.author.username }} says: <strong>{{ post.body }}</strong></p></div>
+    {% include "_post.html" %}
 {% endfor %}
+</table>
+
+{% if prev_url %}
+<a href="{{ prev_url }}">Newer posts</a>
+{% endif %}
+{% if next_url %}
+<a href="{{ next_url }}">Older Posts</a>
+{% endif %}
 
 {% endblock content %}
