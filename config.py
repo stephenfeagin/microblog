@@ -12,9 +12,9 @@ class Config:
     POSTS_PER_PAGE = 10
 
     # SQLAlchemy setup
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL"
-    ) or "sqlite:///" + os.path.join(basedir, "app.db")
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(
+        basedir, "app.db"
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Mail server setup
@@ -23,4 +23,5 @@ class Config:
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS") is not None
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER") or f"noreply@{MAIL_SERVER}"
     ADMINS = ("stephenfeagin@example.com",)

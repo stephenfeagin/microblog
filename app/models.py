@@ -1,11 +1,13 @@
 from datetime import datetime
 from hashlib import md5
-from typing import Union
+from time import time
+from typing import Optional, Union
 
+import jwt
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from app import db, login
+from app import app, db, login
 
 
 followers = db.Table(
@@ -68,11 +70,46 @@ class User(UserMixin, db.Model):
 
     def followed_posts(self):
         """Fetches posts written by users in the parent object's `followed` list"""
-        followed = Post.query.join(
-            followers, (followers.c.followed_id == Post.user_id)
-        ).filter(followers.c.follower_id == self.id)
+        followed = Post.query.join(followers, (followers.c.followed_id == Post.user_id)).filter(
+            followers.c.follower_id == self.id
+        )
         own = Post.query.filter_by(user_id=self.id)
         return followed.union(own).order_by(Post.timestamp.desc())
+
+    def get_reset_password_token(self, expires_in: int = 600) -> str:
+        """Provides a password reset token for a given user.
+
+        :param expires_in: How long the token is valid, in seconds, defaults to 600
+        :type expires_in: int
+
+        :return: JSON Web Token for the user's password request
+        :rtype: str
+        """
+
+        return jwt.encode(
+            {"reset_password": self.id, "exp": time() + expires_in},
+            app.config["SECRET_KEY"],
+            algorithm="HS256",
+        ).decode("utf-8")
+
+    @staticmethod
+    def verify_reset_password_token(token: str) -> Optional["User"]:
+        """Looks up a user referenced by a JWT password reset token, or returns None if there is an
+        error decoding the JWT.
+
+        :param token: JWT password reset token
+        :type token: str
+
+        :return: User object, or None
+        :rtype: Optional[User]
+        """
+
+        try:
+            id = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])["reset_password"]
+        except jwt.PyJWTError as e:
+            app.logger.info(e)
+            return
+        return User.query.get(id)
 
 
 @login.user_loader

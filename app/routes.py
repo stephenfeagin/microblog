@@ -9,7 +9,15 @@ from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from werkzeug.urls import url_parse
 
 from app import app, db
-from app.forms import EditProfileForm, LoginForm, PostForm, RegistrationForm
+from app.email import send_password_reset_email
+from app.forms import (
+    EditProfileForm,
+    LoginForm,
+    PostForm,
+    RegistrationForm,
+    ResetPasswordForm,
+    ResetPasswordRequestForm,
+)
 from app.models import Post, User
 
 
@@ -58,12 +66,8 @@ def index():
     posts: Pagination = current_user.followed_posts().paginate(
         page, app.config["POSTS_PER_PAGE"], error_out=False
     )
-    next_url: Optional[str] = url_for(
-        "index", page=posts.next_num
-    ) if posts.has_next else None
-    prev_url: Optional[str] = url_for(
-        "index", page=posts.prev_num
-    ) if posts.has_prev else None
+    next_url: Optional[str] = url_for("index", page=posts.next_num) if posts.has_next else None
+    prev_url: Optional[str] = url_for("index", page=posts.prev_num) if posts.has_prev else None
     return render_template(
         "index.html",
         title="Home",
@@ -223,16 +227,41 @@ def explore():
     posts: Pagination = Post.query.order_by(Post.timestamp.desc()).paginate(
         page, app.config["POSTS_PER_PAGE"], error_out=False
     )
-    next_url: Optional[str] = url_for(
-        "index", page=posts.next_num
-    ) if posts.has_next else None
-    prev_url: Optional[str] = url_for(
-        "index", page=posts.prev_num
-    ) if posts.has_prev else None
+    next_url: Optional[str] = url_for("index", page=posts.next_num) if posts.has_next else None
+    prev_url: Optional[str] = url_for("index", page=posts.prev_num) if posts.has_prev else None
     return render_template(
-        "index.html",
-        title="Explore",
-        posts=posts.items,
-        next_url=next_url,
-        prev_url=prev_url,
+        "index.html", title="Explore", posts=posts.items, next_url=next_url, prev_url=prev_url,
     )
+
+
+@app.route("/reset_password_request", methods=["GET", "POST"])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user: Optional[User] = User.query.filter_by(email=form.email.data).first()
+        if user is not None:
+            send_password_reset_email(user)
+        flash("Check your email for the instructions to reset your password")
+        return redirect(url_for("login"))
+    return render_template("reset_password_request.html", title="Reset Password", form=form)
+
+
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    """View for resetting a user's password with a token"""
+
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    user: Optional[User] = User.verify_reset_password_token(token)
+    if user is None:
+        return redirect(url_for("index"))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+        flash("Your password has been reset.")
+        return redirect(url_for("login"))
+    return render_template("reset_password.html", form=form)
