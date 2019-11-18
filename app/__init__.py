@@ -1,8 +1,10 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler, SMTPHandler
+from typing import Optional
 
-from flask import Flask
+from flask import Flask, request
+from flask_babel import Babel, lazy_gettext as _l
 from flask_bootstrap import Bootstrap
 from flask_login import LoginManager
 from flask_mail import Mail
@@ -20,11 +22,23 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 # Other plugins
+babel = Babel(app)
 bootstrap = Bootstrap(app)
 login = LoginManager(app)
-login.login_view = "login"
 moment = Moment(app)
 mail = Mail(app)
+
+login.login_view = "login"
+login.login_message = _l("Please log in to access this page.")
+
+
+@babel.localeselector
+def get_locale() -> Optional[str]:
+    """Attempts to identify the best match for the user's locale based on the entries in the
+    LANGUAGES config
+    """
+    return request.accept_languages.best_match(app.config["LANGUAGES"])
+
 
 if not app.debug:
 
