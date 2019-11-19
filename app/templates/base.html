@@ -58,4 +58,6 @@
     {{ super() }}
     {{ moment.include_moment() }}
     {{ moment.lang(g.locale) }}
+
+    <script>{% include "js/translate.js" %}</script>
 {% endblock scripts %}

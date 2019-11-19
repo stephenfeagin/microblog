@@ -13,6 +13,8 @@ class Config:
     LANGUAGES: List[str] = ["en", "es"]
     POSTS_PER_PAGE: int = 10
 
+    MS_TRANSLATOR_KEY = os.environ.get("MS_TRANSLATOR_KEY")
+
     # SQLAlchemy setup
     SQLALCHEMY_DATABASE_URI: str = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(
         basedir, "app.db"
