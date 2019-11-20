@@ -12,11 +12,11 @@
     </div>
 </div>
 
-<p>{{ _("New User?") }} <a href="{{ url_for('register') }}">{{ _("Click to Register!") }}</a></p>
+<p>{{ _("New User?") }} <a href="{{ url_for('auth.register') }}">{{ _("Click to Register!") }}</a></p>
 
 <p>
     {{ _("Forgot your password?") }} 
-    <a href="{{ url_for('reset_password_request') }}">{{ _("Click to reset it.") }}</a>
+    <a href="{{ url_for('auth.reset_password_request') }}">{{ _("Click to reset it.") }}</a>
 </p>
 
 {% endblock app_content %}

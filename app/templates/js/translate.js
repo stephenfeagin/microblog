@@ -6,7 +6,7 @@ function translate(sourceElem, destElem, sourceLang, destLang) {
         source_language: sourceLang,
         dest_language: destLang
     }).done(function(response) {
-        $(destElem).text(response["text"]);
+        $(destElem).html("<em>" + response["text"] + "</em>");
     }).fail(function() {
         $(destElem).text("{{ _('Error: Could not contact server') }}");
     });
