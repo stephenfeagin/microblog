@@ -15,6 +15,7 @@ class Config:
 
     ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL")
     LANGUAGES: List[str] = ["en", "es"]
+    LOG_TO_STDOUT = os.environ.get("LOG_TO_STDOUT")
     MS_TRANSLATOR_KEY = os.environ.get("MS_TRANSLATOR_KEY")
     POSTS_PER_PAGE: int = 10
 
