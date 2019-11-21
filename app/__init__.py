@@ -6,6 +6,7 @@ import os
 from logging.handlers import RotatingFileHandler, SMTPHandler
 from typing import Optional
 
+from elasticsearch import Elasticsearch
 from flask import current_app, Flask, request
 from flask_babel import Babel, lazy_gettext as _l
 from flask_bootstrap import Bootstrap
@@ -52,6 +53,13 @@ def create_app(config_class: Config = Config) -> Flask:
     login.init_app(app)
     mail.init_app(app)
     moment.init_app(app)
+
+    # Register Elasticsearch as an instance attribute
+    app.elasticsearch: Optional[Elasticsearch] = (
+        Elasticsearch([app.config["ELASTICSEARCH_URL"]])
+        if app.config["ELASTICSEARCH_URL"]
+        else None
+    )
 
     # Register blueprints
     from .auth import bp as auth_bp

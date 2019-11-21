@@ -13,10 +13,10 @@ class Config:
 
     SECRET_KEY: str = os.environ.get("SECRET_KEY") or "you-will-never-guess"
 
+    ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL")
     LANGUAGES: List[str] = ["en", "es"]
-    POSTS_PER_PAGE: int = 10
-
     MS_TRANSLATOR_KEY = os.environ.get("MS_TRANSLATOR_KEY")
+    POSTS_PER_PAGE: int = 10
 
     # SQLAlchemy setup
     SQLALCHEMY_DATABASE_URI: str = os.environ.get("DATABASE_URL") or "sqlite:///" + os.path.join(

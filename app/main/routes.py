@@ -16,7 +16,7 @@ from app.models import Post, User
 from app.translate import translate
 
 from . import bp
-from .forms import EditProfileForm, PostForm
+from .forms import EditProfileForm, PostForm, SearchForm
 
 
 @bp.before_request
@@ -38,6 +38,8 @@ def before_request():
             db.session.commit()
         except (DBAPIError, SQLAlchemyError):
             db.session.rollback()
+
+        g.search_form = SearchForm()
     g.locale = str(get_locale())
 
 
@@ -186,4 +188,23 @@ def translate_text():
                 request.form["text"], request.form["source_language"], request.form["dest_language"]
             )
         }
+    )
+
+
+@bp.route("/search")
+@login_required
+def search():
+    """Returns the results of full-text search"""
+    if g.search_form is None or not g.search_form.validate():
+        return redirect(url_for("main.explore"))
+    page = request.args.get("page", default=1, type=int)
+    posts, total = Post.search(g.search_form.q.data, page, current_app.config["POSTS_PER_PAGE"])
+    next_url = (
+        url_for("main.search", q=g.search_form.q.data, page=page + 1)
+        if total > page * current_app.config["POSTS_PER_PAGE"]
+        else None  # could this be changed to `if total > posts.count() else None`?
+    )
+    prev_url = url_for("main.search", q=g.search_form.q.data, page=page - 1) if page > 1 else None
+    return render_template(
+        "search.html", title=_("Search"), posts=posts, next_url=next_url, prev_url=prev_url
     )
